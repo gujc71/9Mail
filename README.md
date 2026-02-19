@@ -169,3 +169,7 @@ a5 LOGOUT
 - IMAP Server: `src/main/java/com/ninemail/imap/*`
 - DB/MyBatis: `src/main/java/com/ninemail/mapper/*`, `src/main/resources/mybatis/mapper/*`
 - Queue(ActiveMQ/JMS): `src/main/java/com/ninemail/queue/*`
+
+
+### License
+- MIT
