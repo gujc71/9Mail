@@ -1,0 +1,105 @@
+# ============================================================
+# 9Mail Enterprise Mail Server Configuration
+# ============================================================
+server:
+  port: 8080
+
+spring:
+  application:
+    name: 9Mail
+  datasource:
+    url: jdbc:sqlite:data/mailserver.db
+    driver-class-name: org.sqlite.JDBC
+    hikari:
+      maximum-pool-size: 1
+      connection-timeout: 30000
+  activemq:
+    broker-url: vm://embedded?broker.persistent=true&broker.dataDirectory=data/activemq
+    in-memory: false
+  jms:
+    template:
+      default-destination: mail.outbound.queue
+
+# MyBatis Configuration
+mybatis:
+  mapper-locations: classpath:mybatis/mapper/*.xml
+  type-aliases-package: com.ninemail.domain
+  configuration:
+    map-underscore-to-camel-case: true
+    default-fetch-size: 100
+    default-statement-timeout: 30
+
+# 9Mail Server Settings
+ninemail:
+  # Domain Configuration
+  domain: example.com
+  hostname: mail.example.com
+
+  # SMTP Server
+  smtp:
+    port: 25
+    submission-port: 587   # Submission (plain + STARTTLS, for mail clients)
+    ssl-port: 465          # SMTPS (implicit SSL)
+    require-auth: true
+    max-message-size: 26214400  # 25MB
+    max-recipients: 100
+    timeout: 300000  # 5 minutes
+    banner: "9Mail ESMTP Server Ready"
+
+  # IMAP Server
+  imap:
+    port: 143
+    ssl-port: 993
+    timeout: 1800000  # 30 minutes
+    max-line-length: 65536
+
+  # Mail Storage (Maildir)
+  storage:
+    base-path: data/maildir
+
+  # Security & Relay
+  security:
+    relay-ips:
+      - "127.0.0.1"
+      - "::1"
+    max-auth-failures: 5
+    tarpit-delay-ms: 3000
+    rate-limit-per-minute: 30
+
+  # Queue & Retry
+  queue:
+    retry-max-attempts: 5
+    retry-initial-delay-ms: 60000
+    retry-max-delay-ms: 3600000
+    outbound-destination: mail.outbound.queue
+    inbound-destination: mail.inbound.queue
+
+  # TLS (self-signed certificate)
+  tls:
+    enabled: false
+    keystore-path: classpath:ninemail.jks
+    keystore-type: JKS
+#    keystore-type: PKCS12
+    keystore-password: changeit
+    key-password: changeit
+
+# Actuator & Prometheus Metrics
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,metrics,prometheus
+  metrics:
+    tags:
+      application: 9Mail
+
+logging:
+  level:
+    com.ninemail: DEBUG
+    io.netty: INFO
+  file:
+    name: logs/9mail.log
+  logback:
+    rollingpolicy:
+      max-file-size: 50MB
+      max-history: 30

@@ -1,0 +1,76 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.ninemail.mapper.MailMailboxMapper">
+
+    <resultMap id="mailboxMap" type="com.ninemail.domain.MailMailbox">
+        <result column="mailbox_id" property="mailboxId"/>
+        <result column="email" property="email"/>
+        <result column="mailbox_name" property="mailboxName"/>
+        <result column="mailbox_path" property="mailboxPath"/>
+        <result column="reg_dt" property="regDt"/>
+        <result column="total_size" property="totalSize"/>
+        <result column="mail_count" property="mailCount"/>
+        <result column="next_uid" property="nextUid"/>
+        <result column="uid_validity" property="uidValidity"/>
+    </resultMap>
+
+    <insert id="insert" parameterType="com.ninemail.domain.MailMailbox">
+        INSERT INTO MAIL_MAILBOX (mailbox_id, email, mailbox_name, mailbox_path, total_size, mail_count, next_uid, uid_validity)
+        VALUES (#{mailboxId}, #{email}, #{mailboxName}, #{mailboxPath}, #{totalSize}, #{mailCount}, #{nextUid}, #{uidValidity})
+    </insert>
+
+    <select id="findById" resultMap="mailboxMap">
+        SELECT * FROM MAIL_MAILBOX WHERE mailbox_id = #{mailboxId}
+    </select>
+
+    <select id="findByEmailAndPath" resultMap="mailboxMap">
+        SELECT * FROM MAIL_MAILBOX WHERE email = #{email} AND mailbox_path = #{mailboxPath}
+    </select>
+
+    <select id="findByEmail" resultMap="mailboxMap">
+        SELECT * FROM MAIL_MAILBOX WHERE email = #{email} ORDER BY mailbox_path
+    </select>
+
+    <select id="findByEmailAndPattern" resultMap="mailboxMap">
+        SELECT * FROM MAIL_MAILBOX WHERE email = #{email} AND mailbox_path LIKE #{pattern} ORDER BY mailbox_path
+    </select>
+
+    <update id="updateNextUid">
+        UPDATE MAIL_MAILBOX SET next_uid = #{nextUid} WHERE mailbox_id = #{mailboxId}
+    </update>
+
+    <update id="updateMailCount">
+        UPDATE MAIL_MAILBOX SET mail_count = #{mailCount} WHERE mailbox_id = #{mailboxId}
+    </update>
+
+    <update id="updateTotalSize">
+        UPDATE MAIL_MAILBOX SET total_size = #{totalSize} WHERE mailbox_id = #{mailboxId}
+    </update>
+
+    <update id="incrementMailCount">
+        UPDATE MAIL_MAILBOX
+        SET mail_count = mail_count + 1, total_size = total_size + #{sizeIncrement}
+        WHERE mailbox_id = #{mailboxId}
+    </update>
+
+    <update id="decrementMailCount">
+        UPDATE MAIL_MAILBOX
+        SET mail_count = CASE WHEN mail_count > 0 THEN mail_count - 1 ELSE 0 END,
+            total_size = CASE WHEN total_size >= #{sizeDelta} THEN total_size - #{sizeDelta} ELSE 0 END
+        WHERE mailbox_id = #{mailboxId}
+    </update>
+
+    <update id="rename">
+        UPDATE MAIL_MAILBOX
+        SET mailbox_name = #{newName}, mailbox_path = #{newPath}
+        WHERE mailbox_id = #{mailboxId}
+    </update>
+
+    <delete id="deleteById">
+        DELETE FROM MAIL_MAILBOX WHERE mailbox_id = #{mailboxId}
+    </delete>
+
+    <select id="getNextUid" resultType="int">
+        SELECT next_uid FROM MAIL_MAILBOX WHERE mailbox_id = #{mailboxId}
+    </select>
+</mapper>

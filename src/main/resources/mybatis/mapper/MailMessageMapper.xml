@@ -1,0 +1,40 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.ninemail.mapper.MailMessageMapper">
+
+    <resultMap id="messageMap" type="com.ninemail.domain.MailMessage">
+        <result column="message_id" property="messageId"/>
+        <result column="subject" property="subject"/>
+        <result column="sender" property="sender"/>
+        <result column="send_dt" property="sendDt"/>
+        <result column="recipient" property="recipient"/>
+        <result column="filename" property="filename"/>
+    </resultMap>
+
+    <insert id="insert" parameterType="com.ninemail.domain.MailMessage">
+        INSERT INTO MAIL_MESSAGE (message_id, subject, sender, send_dt, recipient, filename)
+        VALUES (#{messageId}, #{subject}, #{sender}, #{sendDt}, #{recipient}, #{filename})
+    </insert>
+
+    <update id="updateFilename">
+        UPDATE MAIL_MESSAGE
+        SET filename = #{filename}
+        WHERE message_id = #{messageId}
+    </update>
+
+    <select id="findById" resultMap="messageMap">
+        SELECT * FROM MAIL_MESSAGE WHERE message_id = #{messageId}
+    </select>
+
+    <select id="findBySender" resultMap="messageMap">
+        SELECT * FROM MAIL_MESSAGE WHERE sender = #{sender}
+    </select>
+
+    <delete id="deleteById">
+        DELETE FROM MAIL_MESSAGE WHERE message_id = #{messageId}
+    </delete>
+
+    <select id="countById" resultType="int">
+        SELECT COUNT(*) FROM MAIL_MESSAGE WHERE message_id = #{messageId}
+    </select>
+</mapper>

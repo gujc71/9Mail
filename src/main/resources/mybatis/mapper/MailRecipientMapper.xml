@@ -1,0 +1,31 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.ninemail.mapper.MailRecipientMapper">
+
+    <resultMap id="recipientMap" type="com.ninemail.domain.MailRecipient">
+        <result column="id" property="id"/>
+        <result column="message_id" property="messageId"/>
+        <result column="email" property="email"/>
+    </resultMap>
+
+    <insert id="insert" parameterType="com.ninemail.domain.MailRecipient">
+        INSERT OR IGNORE INTO MAIL_RECIPIENT (message_id, email)
+        VALUES (#{messageId}, #{email})
+    </insert>
+
+    <select id="findByMessageId" resultMap="recipientMap">
+        SELECT * FROM MAIL_RECIPIENT WHERE message_id = #{messageId}
+    </select>
+
+    <select id="findByEmail" resultMap="recipientMap">
+        SELECT * FROM MAIL_RECIPIENT WHERE email = #{email}
+    </select>
+
+    <delete id="deleteByMessageId">
+        DELETE FROM MAIL_RECIPIENT WHERE message_id = #{messageId}
+    </delete>
+
+    <select id="countByMessageIdAndEmail" resultType="int">
+        SELECT COUNT(*) FROM MAIL_RECIPIENT WHERE message_id = #{messageId} AND email = #{email}
+    </select>
+</mapper>

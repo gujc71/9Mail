@@ -1,0 +1,116 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.ninemail.mapper.MailMailMapper">
+
+    <resultMap id="mailMap" type="com.ninemail.domain.MailMail">
+        <result column="id" property="id"/>
+        <result column="message_id" property="messageId"/>
+        <result column="mailbox_id" property="mailboxId"/>
+        <result column="uid" property="uid"/>
+        <result column="receive_dt" property="receiveDt"/>
+        <result column="receive_time" property="receiveTime"/>
+        <result column="is_read" property="isRead"/>
+        <result column="is_flagged" property="isFlagged"/>
+        <result column="is_answered" property="isAnswered"/>
+        <result column="is_deleted" property="isDeleted"/>
+        <result column="is_draft" property="isDraft"/>
+        <result column="size" property="size"/>
+    </resultMap>
+
+    <insert id="insert" parameterType="com.ninemail.domain.MailMail" useGeneratedKeys="true" keyProperty="id">
+        INSERT INTO MAIL_MAIL (message_id, mailbox_id, uid, receive_dt, receive_time, is_read, is_flagged, is_answered, is_deleted, is_draft, size)
+        VALUES (#{messageId}, #{mailboxId}, #{uid}, #{receiveDt}, #{receiveTime},
+                #{isRead}, #{isFlagged}, #{isAnswered}, #{isDeleted}, #{isDraft}, #{size})
+    </insert>
+
+    <select id="findById" resultMap="mailMap">
+        SELECT * FROM MAIL_MAIL WHERE id = #{id}
+    </select>
+
+    <select id="findByMailboxIdAndUid" resultMap="mailMap">
+        SELECT * FROM MAIL_MAIL WHERE mailbox_id = #{mailboxId} AND uid = #{uid}
+    </select>
+
+    <select id="findByMailboxId" resultMap="mailMap">
+        SELECT m.*, msg.subject, msg.sender, msg.send_dt
+        FROM MAIL_MAIL m
+        LEFT JOIN MAIL_MESSAGE msg ON m.message_id = msg.message_id
+        WHERE m.mailbox_id = #{mailboxId}
+        ORDER BY m.uid ASC
+    </select>
+
+    <select id="findByMailboxIdWithRange" resultMap="mailMap">
+        SELECT * FROM MAIL_MAIL
+        WHERE mailbox_id = #{mailboxId} AND uid BETWEEN #{startUid} AND #{endUid}
+        ORDER BY uid ASC
+    </select>
+
+    <select id="findByMailboxIdUnread" resultMap="mailMap">
+        SELECT * FROM MAIL_MAIL WHERE mailbox_id = #{mailboxId} AND is_read = 0 ORDER BY uid ASC
+    </select>
+
+    <select id="findByMessageId" resultMap="mailMap">
+        SELECT * FROM MAIL_MAIL WHERE message_id = #{messageId}
+    </select>
+
+    <select id="countByMailboxId" resultType="int">
+        SELECT COUNT(*) FROM MAIL_MAIL WHERE mailbox_id = #{mailboxId}
+    </select>
+
+    <select id="countUnreadByMailboxId" resultType="int">
+        SELECT COUNT(*) FROM MAIL_MAIL WHERE mailbox_id = #{mailboxId} AND is_read = 0
+    </select>
+
+    <select id="countDeletedByMailboxId" resultType="int">
+        SELECT COUNT(*) FROM MAIL_MAIL WHERE mailbox_id = #{mailboxId} AND is_deleted = 1
+    </select>
+
+    <select id="getMaxUidByMailboxId" resultType="int">
+        SELECT COALESCE(MAX(uid), 0) FROM MAIL_MAIL WHERE mailbox_id = #{mailboxId}
+    </select>
+
+    <update id="updateFlags">
+        UPDATE MAIL_MAIL
+        SET is_read = #{isRead}, is_flagged = #{isFlagged}, is_answered = #{isAnswered},
+            is_deleted = #{isDeleted}, is_draft = #{isDraft}
+        WHERE id = #{id}
+    </update>
+
+    <update id="markRead">
+        UPDATE MAIL_MAIL SET is_read = #{isRead} WHERE id = #{id}
+    </update>
+
+    <update id="markDeleted">
+        UPDATE MAIL_MAIL SET is_deleted = #{isDeleted} WHERE id = #{id}
+    </update>
+
+    <update id="markFlagged">
+        UPDATE MAIL_MAIL SET is_flagged = #{isFlagged} WHERE id = #{id}
+    </update>
+
+    <delete id="deleteById">
+        DELETE FROM MAIL_MAIL WHERE id = #{id}
+    </delete>
+
+    <delete id="deleteByMailboxIdAndDeleted">
+        DELETE FROM MAIL_MAIL WHERE mailbox_id = #{mailboxId} AND is_deleted = 1
+    </delete>
+
+    <select id="findDeletedByMailboxId" resultMap="mailMap">
+        SELECT * FROM MAIL_MAIL WHERE mailbox_id = #{mailboxId} AND is_deleted = 1 ORDER BY uid ASC
+    </select>
+
+    <select id="searchBySubject" resultMap="mailMap">
+        SELECT m.* FROM MAIL_MAIL m
+        JOIN MAIL_MESSAGE msg ON m.message_id = msg.message_id
+        WHERE m.mailbox_id = #{mailboxId} AND msg.subject LIKE '%' || #{keyword} || '%'
+        ORDER BY m.uid ASC
+    </select>
+
+    <select id="searchByFrom" resultMap="mailMap">
+        SELECT m.* FROM MAIL_MAIL m
+        JOIN MAIL_MESSAGE msg ON m.message_id = msg.message_id
+        WHERE m.mailbox_id = #{mailboxId} AND msg.sender LIKE '%' || #{keyword} || '%'
+        ORDER BY m.uid ASC
+    </select>
+</mapper>
