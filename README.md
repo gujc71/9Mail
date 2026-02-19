@@ -29,7 +29,7 @@ Note: The default configuration uses privileged ports (SMTP: 25, IMAP: 143), whi
 
 ## Tech Stack
 
-- Java 17, Spring Boot 3.2.x
+- Java 25, Spring Boot 3.2.x
 - Netty 4.1.x (SMTP/IMAP Tech Stack)
 - Spring WebFlux (REST API)
 - MyBatis + SQLite (`data/mailserver.db`)
@@ -41,7 +41,7 @@ Note: The default configuration uses privileged ports (SMTP: 25, IMAP: 143), whi
 
 ### 1) Requirements
 
-- JDK 17+
+- JDK 25+
 - Maven 3.8+
 
 ### 2) Check/Change Configuration
@@ -64,6 +64,13 @@ ninemail:
     port: 25
   imap:
     port: 143
+```
+
+Specify the domain name to use 
+```yaml
+ninemail:
+  # Domain Configuration
+  domain: example.com
 ```
 
 ### 3) Execution
