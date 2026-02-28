@@ -1,8 +1,13 @@
 # 9Mail (NineMail) Enterprise Mail Server
 
-9Mail is an SMTP/IMAP mail server implementation built on Java Spring Boot and Netty. It manages local domain user accounts, mailboxes, and message metadata using SQLite (MyBatis), while separating mail processing flows into ActiveMQ (JMS) queues for asynchronous handling.
+9Mail is an SMTP/IMAP mail server implementation built on Java Spring Boot and Netty, developed entirely using AI. It manages local domain user accounts, mailboxes, and message metadata using SQLite (MyBatis), while separating mail processing flows into ActiveMQ (JMS) queues for asynchronous handling.
 
 Note: The default configuration uses privileged ports (SMTP: 25, IMAP: 143), which require administrator/root privileges.
+
+After installing and starting the 9Mail server, verify its main features using an MUA (e.g., Thunderbird or Outlook) or the dedicated webmail application below.
+
+https://github.com/gujc71/9MailW
+
 
 ## Core Concepts
 
@@ -29,7 +34,7 @@ Note: The default configuration uses privileged ports (SMTP: 25, IMAP: 143), whi
 
 ## Tech Stack
 
-- Java 25, Spring Boot 3.2.x
+- Java 17, Spring Boot 3.2.x
 - Netty 4.1.x (SMTP/IMAP Tech Stack)
 - Spring WebFlux (REST API)
 - MyBatis + SQLite (`data/mailserver.db`)
@@ -41,7 +46,7 @@ Note: The default configuration uses privileged ports (SMTP: 25, IMAP: 143), whi
 
 ### 1) Requirements
 
-- JDK 25+
+- JDK 17+
 - Maven 3.8+
 
 ### 2) Check/Change Configuration
