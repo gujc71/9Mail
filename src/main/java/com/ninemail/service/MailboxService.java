@@ -50,15 +50,16 @@ public class MailboxService {
             return existing;
         }
 
+        String id = MaildirUtil.generateMailboxId();
         MailMailbox mailbox = MailMailbox.builder()
-                .mailboxId(MaildirUtil.generateMailboxId())
+                .mailboxId(id)
                 .email(email)
                 .mailboxName(name)
                 .mailboxPath(path)
                 .totalSize(0)
                 .mailCount(0)
                 .nextUid(1)
-                .uidValidity(1)
+                .uidValidity(Integer.parseInt(id))
                 .build();
 
         mailboxMapper.insert(mailbox);
