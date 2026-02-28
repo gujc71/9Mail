@@ -10,21 +10,17 @@ import com.ninemail.util.CryptoUtil;
 import com.ninemail.util.EmlParser;
 import io.micrometer.core.instrument.MeterRegistry;
 import io.netty.channel.ChannelHandlerContext;
-import io.netty.channel.SimpleChannelInboundHandler;
+import io.netty.channel.ChannelInboundHandlerAdapter;
+import io.netty.handler.codec.TooLongFrameException;
 import io.netty.handler.ssl.SslContext;
 import io.netty.handler.ssl.SslHandler;
 import jakarta.mail.internet.MimeMessage;
 import lombok.extern.slf4j.Slf4j;
 
 import jakarta.mail.Address;
-import jakarta.mail.BodyPart;
 import jakarta.mail.Multipart;
 import jakarta.mail.internet.InternetAddress;
-import jakarta.mail.internet.MimeMultipart;
-
-import java.io.ByteArrayInputStream;
 import java.nio.charset.StandardCharsets;
-import java.util.Arrays;
 import java.net.InetSocketAddress;
 import java.text.SimpleDateFormat;
 import java.util.*;
@@ -45,7 +41,7 @@ import java.util.stream.Collectors;
  * EXPUNGE
  */
 @Slf4j
-public class ImapCommandHandler extends SimpleChannelInboundHandler<String> {
+public class ImapCommandHandler extends ChannelInboundHandlerAdapter {
 
     private final ImapSession session = new ImapSession();
     private final ServerProperties properties;
@@ -99,9 +95,30 @@ public class ImapCommandHandler extends SimpleChannelInboundHandler<String> {
     }
 
     @Override
-    protected void channelRead0(ChannelHandlerContext ctx, String msg) {
+    public void channelRead(ChannelHandlerContext ctx, Object msg) throws Exception {
+        if (msg instanceof byte[]) {
+            // Complete IMAP literal data delivered by ImapDecoder
+            handleLiteralComplete(ctx, (byte[]) msg);
+            return;
+        }
+        if (msg instanceof String) {
+            handleLine(ctx, (String) msg);
+            return;
+        }
+        super.channelRead(ctx, msg);
+    }
+
+    /**
+     * Process a line-oriented IMAP message (String).
+     */
+    private void handleLine(ChannelHandlerContext ctx, String msg) {
         String line = msg;
         log.debug("IMAP << {}", line);
+
+        // Ignore empty lines (safety net for post-literal trailing CRLF)
+        if (line.isEmpty()) {
+            return;
+        }
 
         // Exit IDLE mode
         if (session.isIdleMode()) {
@@ -109,12 +126,6 @@ public class ImapCommandHandler extends SimpleChannelInboundHandler<String> {
                 session.setIdleMode(false);
                 respond(ctx, session.getIdleTag() + " OK IDLE terminated");
             }
-            return;
-        }
-
-        // APPEND literal receiving mode
-        if (session.isAppendMode()) {
-            handleAppendData(ctx, line);
             return;
         }
 
@@ -680,7 +691,6 @@ public class ImapCommandHandler extends SimpleChannelInboundHandler<String> {
     private void handleAppend(ChannelHandlerContext ctx, String tag, String args) {
         if (!requireAuth(ctx, tag))
             return;
-
         // APPEND "mailbox" (\Flags) "date" {size}
         // Simplified: literal size parsing
         int braceStart = args.lastIndexOf('{');
@@ -722,13 +732,19 @@ public class ImapCommandHandler extends SimpleChannelInboundHandler<String> {
             flags = beforeBrace.substring(flagsStart + 1, flagsEnd).trim();
         }
 
+        // Store APPEND context in session for when literal data arrives
         session.setAppendMode(true);
         session.setAppendMailbox(mailboxName);
         session.setAppendFlags(flags);
         session.setAppendSize(size);
         session.setAppendTag(tag);
-        session.setAppendBuffer(new StringBuilder());
-        session.setAppendBytesReceived(0);
+
+        // Tell the decoder to switch to byte-counted literal mode.
+        // This ensures exact byte counting regardless of line endings or encoding.
+        ImapDecoder decoder = ctx.pipeline().get(ImapDecoder.class);
+        if (decoder != null) {
+            decoder.startLiteral(size);
+        }
 
         // LITERAL+: client already started sending data, no continuation needed
         if (!nonSync) {
@@ -736,41 +752,31 @@ public class ImapCommandHandler extends SimpleChannelInboundHandler<String> {
         }
     }
 
-    private void handleAppendData(ChannelHandlerContext ctx, String line) {
-        // Restore the CRLF that DelimiterBasedFrameDecoder stripped
-        byte[] lineBytes = (line + "\r\n").getBytes(StandardCharsets.UTF_8);
-        session.getAppendBuffer().append(line).append("\r\n");
-        session.setAppendBytesReceived(session.getAppendBytesReceived() + lineBytes.length);
+    /**
+     * Handle the complete literal data delivered by ImapDecoder.
+     * The byte[] is the exact raw bytes of the APPEND literal.
+     */
+    private void handleLiteralComplete(ChannelHandlerContext ctx, byte[] emlData) {
+        String tag = session.getAppendTag();
+        session.setAppendMode(false);
 
-        log.debug("APPEND data: received={} / declared={} bytes",
-                session.getAppendBytesReceived(), session.getAppendSize());
+        try {
+            String email = session.getAuthenticatedUser();
+            String mailboxName = session.getAppendMailbox();
+            String flags = session.getAppendFlags();
 
-        if (session.getAppendBytesReceived() >= session.getAppendSize()) {
-            session.setAppendMode(false);
-            String tag = session.getAppendTag();
+            log.debug("APPEND complete: mailbox={}, user={}, size={}",
+                    mailboxName, email, emlData.length);
 
-            try {
-                // Convert to UTF-8 bytes and trim exactly to declared size
-                byte[] fullBytes = session.getAppendBuffer().toString().getBytes(StandardCharsets.UTF_8);
-                byte[] emlData = Arrays.copyOf(fullBytes, Math.min(session.getAppendSize(), fullBytes.length));
-                String email = session.getAuthenticatedUser();
-                String mailboxName = session.getAppendMailbox();
-
-                log.debug("APPEND complete: mailbox={}, user={}, size={}",
-                        mailboxName, email, emlData.length);
-
-                // Store into the requested mailbox (Sent/Drafts/etc). Do NOT re-deliver to
-                // INBOX.
-                String flags = session.getAppendFlags();
-                MessageService.AppendResult appendResult = messageService.appendToMailbox(email, mailboxName, emlData,
-                        flags);
-                respond(ctx, tag + " OK [APPENDUID " + appendResult.uidValidity() + " " + appendResult.uid()
-                        + "] APPEND completed");
-            } catch (Exception e) {
-                log.error("APPEND failed: mailbox={}, user={}", session.getAppendMailbox(),
-                        session.getAuthenticatedUser(), e);
-                respond(ctx, tag + " NO APPEND failed: " + e.getMessage());
-            }
+            // Store into the requested mailbox (Sent/Drafts/etc). Do NOT re-deliver to INBOX.
+            MessageService.AppendResult appendResult = messageService.appendToMailbox(email, mailboxName, emlData,
+                    flags);
+            respond(ctx, tag + " OK [APPENDUID " + appendResult.uidValidity() + " " + appendResult.uid()
+                    + "] APPEND completed");
+        } catch (Exception e) {
+            log.error("APPEND failed: mailbox={}, user={}", session.getAppendMailbox(),
+                    session.getAuthenticatedUser(), e);
+            respond(ctx, tag + " NO APPEND failed: " + e.getMessage());
         }
     }
 
@@ -1818,6 +1824,30 @@ public class ImapCommandHandler extends SimpleChannelInboundHandler<String> {
             ip = addr != null ? addr.getAddress().getHostAddress() : "unknown";
         }
         String msg = cause.getMessage();
+
+        // If in APPEND mode, clean up and respond with NO instead of closing
+        if (session.isAppendMode()) {
+            session.setAppendMode(false);
+            ImapDecoder decoder = ctx.pipeline().get(ImapDecoder.class);
+            if (decoder != null) {
+                decoder.cancelLiteral();
+            }
+            String tag = session.getAppendTag();
+            if (tag != null) {
+                log.error("APPEND error from {}: {}", ip, msg, cause);
+                respond(ctx, tag + " NO APPEND failed: server error");
+                return; // Don't close – let the client retry on this connection
+            }
+        }
+
+        // TooLongFrameException: the decoder already skipped the bad frame,
+        // so the connection is still usable – respond BAD and keep going.
+        if (cause instanceof TooLongFrameException) {
+            log.warn("IMAP frame too long from {}: {}", ip, msg);
+            ctx.writeAndFlush("* BAD Line too long\r\n");
+            return;
+        }
+
         if (cause instanceof javax.net.ssl.SSLHandshakeException
                 || (cause.getCause() != null && cause.getCause() instanceof javax.net.ssl.SSLHandshakeException)) {
             log.warn("IMAP TLS handshake failed from {}: {} (client may not trust the certificate)", ip, msg);

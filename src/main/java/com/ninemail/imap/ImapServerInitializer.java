@@ -8,9 +8,6 @@ import io.micrometer.core.instrument.MeterRegistry;
 import io.netty.channel.ChannelInitializer;
 import io.netty.channel.ChannelPipeline;
 import io.netty.channel.socket.SocketChannel;
-import io.netty.handler.codec.DelimiterBasedFrameDecoder;
-import io.netty.handler.codec.Delimiters;
-import io.netty.handler.codec.string.StringDecoder;
 import io.netty.handler.codec.string.StringEncoder;
 import io.netty.handler.ssl.SslContext;
 import io.netty.handler.ssl.SslHandler;
@@ -62,10 +59,9 @@ public class ImapServerInitializer extends ChannelInitializer<SocketChannel> {
         pipeline.addLast("idleState", new IdleStateHandler(
                 0, 0, properties.getImap().getTimeout(), TimeUnit.MILLISECONDS));
 
-        // IMAP is also line-oriented
-        pipeline.addLast("framer", new DelimiterBasedFrameDecoder(
-                properties.getImap().getMaxLineLength(), Delimiters.lineDelimiter()));
-        pipeline.addLast("decoder", new StringDecoder(StandardCharsets.UTF_8));
+        // IMAP decoder: line-delimited mode for commands, byte-counted mode for literals
+        pipeline.addLast("imapDecoder", new ImapDecoder(
+                properties.getImap().getMaxLineLength()));
         pipeline.addLast("encoder", new StringEncoder(StandardCharsets.UTF_8));
 
         // IMAP command handler
